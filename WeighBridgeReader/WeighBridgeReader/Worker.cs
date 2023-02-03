@@ -2,76 +2,71 @@ using System.Net.Sockets;
 using System.Net;
 using System.Text;
 using Microsoft.Extensions.Configuration;
+using WeighBridgeReader.Classes.WeighBridge;
+using WeighBridgeReader.Classes;
 
 namespace WeighBridgeReader
 {
     public class Worker : BackgroundService
     {
-        private readonly IPAddress _deviceIP;
-        private readonly int _port;
-
+        //Logger used for errors and messages
         private readonly ILogger<Worker> _logger;
-        private readonly int _stringLength = 11;
+
+        //Delayed wait time for how long to wait till the next run
         private readonly int _waitTime = 1000;
 
+        //Contains all the weighbridges to read
+        private List<M4222_WBReader> _weighBridges = new List<M4222_WBReader>(); 
+
+
+        /// <summary>
+        /// Constructor used to setup the service and to load all the weighbridges
+        /// </summary>
+        /// <param name="logger">Access to the eventlog and messages</param>
+        /// <param name="configuration">Access to the config files for loading in settings</param>
+        /// <exception cref="ArgumentException">Only occurs if the config file is incorrectly setup</exception>
         public Worker(ILogger<Worker> logger, IConfiguration configuration)
         {
             _logger = logger;
 
-            _deviceIP = IPAddress.Parse(configuration.GetValue<string>("WeighBridgeIP"));
-            _port = configuration.GetValue<int>("WeighBridgePort");
-        }
+            List<WeighBridgeSettings> weighBridges = configuration.GetSection("WeighBridges").Get<List<WeighBridgeSettings>>();
 
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-        {
-            
-            int byteLength = 253;
-
-            while (!stoppingToken.IsCancellationRequested)
+            if(weighBridges == null)
             {
-                Socket sock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                EndPoint ep = new IPEndPoint(_deviceIP, _port);
-                sock.Connect(ep);
+                throw new ArgumentException("Appsettings file is incorrectly configured");
+            }
+ 
+            foreach(WeighBridgeSettings wb in weighBridges)
+            {
+                if (wb.IP == string.Empty || wb.Port == 0)
+                    new Exception("Weighbridge incorrectly setup in the config file");
 
-                
-
-                if (sock.Connected)
-                {
-                    byte[] bytes = new byte[byteLength];
-                    int i = sock.Receive(bytes);
-                    //Console.WriteLine(Encoding.UTF8.GetString(bytes));
-                    ReadInWeight(i, bytes);
-                }
-
-                sock.Close();
-
-                _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
-                await Task.Delay(_waitTime, stoppingToken);
+                _weighBridges.Add(new M4222_WBReader(logger, wb));
             }
         }
 
 
-        private void ReadInWeight(int bytesLength, byte[] bytes)
+        /// <summary>
+        /// Executes on run and controls the looping
+        /// </summary>
+        /// <param name="stoppingToken"></param>
+        /// <returns></returns>
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            //Check to see if read is complete read
-            if (bytesLength % _stringLength != 0)
-                return;
-
-            for(int i = 0; i < bytesLength; i++)
+            while (!stoppingToken.IsCancellationRequested)
             {
-                if (bytes[i] != 2)
-                    continue;
+                foreach(WBReader wb in _weighBridges)
+                {
+                    bool result = wb.ReadNetwork();
+                    if(result)
+                    {
+                        _logger.LogInformation($"WeighBridge: Weight - {wb.LastReadValue} - Status - {wb.WeighBridgeStatus}");
+                        _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
+                    }
+                }
 
-                byte[] data = new byte[7];
-                Array.Copy(bytes, i + 2, data, 0, 7);
-                i += _stringLength;
-                
-                bool result = float.TryParse(Encoding.UTF8.GetString(data), out float weight);
-                //Check if the weight was read correctly
-                if(!result)
-                    continue;
-
-                Console.WriteLine($"Found Weight: {weight}");
+                //Wait for delay time
+                await Task.Delay(_waitTime, stoppingToken);
             }
         }
     }

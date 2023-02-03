@@ -1,3 +1,5 @@
+using WeighBridgeReader.Classes;
+
 namespace WeighBridgeReader
 {
     public class Program

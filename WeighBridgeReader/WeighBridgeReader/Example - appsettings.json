@@ -5,6 +5,10 @@
       "Microsoft.Hosting.Lifetime": "Information"
     }
   },
-  "WeighBridgeIP": "192.168.0.1",
-  "WeighBridgePort": 80
+  "WeighBridges": [
+    {
+      "IP": "192.168.0.1",
+      "Port": 80
+    }
+  ]
 }
