@@ -65,10 +65,7 @@ namespace WeighBridgeReader
                     bool result = wb.ReadNetwork();
                     if(result)
                     {
-                        _ = Task.Run(async () =>
-                        {
-                            await SendWeightInformationAsync(_url, wb.ExtractPostData());
-                        });
+                        _ = Task.Run(async () => await SendWeightInformationAsync(_url, wb.ExtractPostData(), _logger));
 
 #if DEBUG
                         _logger.LogInformation("Posting data");
@@ -90,14 +87,22 @@ namespace WeighBridgeReader
         /// <param name="url"></param>
         /// <param name="postData"></param>
         /// <returns></returns>
-        private async Task SendWeightInformationAsync(string url, WeighbridgePOSTData postData)
+        private async Task SendWeightInformationAsync(string url, WeighbridgePOSTData postData, ILogger<Worker> logger)
         {
             HttpClient client = new HttpClient();
-            string jsonString = JsonSerializer.Serialize(postData);
-            HttpContent content = new StringContent(jsonString, UnicodeEncoding.UTF8, "application/json");
-            client.Timeout = TimeSpan.FromSeconds(4);
+            try
+            {
+                string jsonString = JsonSerializer.Serialize(postData);
+                HttpContent content = new StringContent(jsonString, UnicodeEncoding.UTF8, "application/json");
+                client.Timeout = TimeSpan.FromSeconds(4);
 
-            await client.PostAsync(url, content);
+                await client.PostAsync(url, content);
+            }
+            catch(Exception ex)
+            {
+                logger.LogError($"Error Posting to URL: {ex.Message}");
+            }
+            
             client.Dispose();
         }
     }
