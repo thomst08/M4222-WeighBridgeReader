@@ -1,9 +1,11 @@
 using System.Net.Sockets;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using WeighBridgeReader.Classes.WeighBridge;
 using WeighBridgeReader.Classes;
+
 
 namespace WeighBridgeReader
 {
@@ -16,8 +18,10 @@ namespace WeighBridgeReader
         private readonly int _waitTime = 1000;
 
         //Contains all the weighbridges to read
-        private List<M4222_WBReader> _weighBridges = new List<M4222_WBReader>(); 
+        private List<M4222_WBReader> _weighBridges = new List<M4222_WBReader>();
 
+        //URL to submit all data to
+        private string _url;
 
         /// <summary>
         /// Constructor used to setup the service and to load all the weighbridges
@@ -29,6 +33,7 @@ namespace WeighBridgeReader
         {
             _logger = logger;
 
+            _url = configuration.GetValue<string>("PostURL");
             List<WeighBridgeSettings> weighBridges = configuration.GetSection("WeighBridges").Get<List<WeighBridgeSettings>>();
 
             if(weighBridges == null)
@@ -38,7 +43,7 @@ namespace WeighBridgeReader
  
             foreach(WeighBridgeSettings wb in weighBridges)
             {
-                if (wb.IP == string.Empty || wb.Port == 0)
+                if (wb.IP == string.Empty || wb.Port == 0 || wb.WeighbridgeName == string.Empty)
                     new Exception("Weighbridge incorrectly setup in the config file");
 
                 _weighBridges.Add(new M4222_WBReader(logger, wb));
@@ -60,14 +65,40 @@ namespace WeighBridgeReader
                     bool result = wb.ReadNetwork();
                     if(result)
                     {
+                        _ = Task.Run(async () =>
+                        {
+                            await SendWeightInformationAsync(_url, wb.ExtractPostData());
+                        });
+
+#if DEBUG
+                        _logger.LogInformation("Posting data");
                         _logger.LogInformation($"WeighBridge: Weight - {wb.LastReadValue} - Status - {wb.WeighBridgeStatus}");
                         _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
+#endif
                     }
                 }
 
                 //Wait for delay time
                 await Task.Delay(_waitTime, stoppingToken);
             }
+        }
+
+
+        /// <summary>
+        /// Function used to send weight information to URL
+        /// </summary>
+        /// <param name="url"></param>
+        /// <param name="postData"></param>
+        /// <returns></returns>
+        private async Task SendWeightInformationAsync(string url, WeighbridgePOSTData postData)
+        {
+            HttpClient client = new HttpClient();
+            string jsonString = JsonSerializer.Serialize(postData);
+            HttpContent content = new StringContent(jsonString, UnicodeEncoding.UTF8, "application/json");
+            client.Timeout = TimeSpan.FromSeconds(4);
+
+            await client.PostAsync(url, content);
+            client.Dispose();
         }
     }
 }

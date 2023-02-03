@@ -16,6 +16,7 @@ namespace WeighBridgeReader.Classes.WeighBridge
         private IPAddress IPAddress { get; set; }
         private int Port { get; set; }
 
+        public string WeighbridgeName { get; private set; }
         public float LastReadValue { get; protected set; }
         public char WeighBridgeStatus { get; protected set; }
 
@@ -24,15 +25,16 @@ namespace WeighBridgeReader.Classes.WeighBridge
         /// Setups up the weighbridge into a default state
         /// </summary>
         /// <param name="logger">Logger to write errors</param>
-        /// <param name="deviceIP">IP of the bridge to connect to</param>
-        /// <param name="port">Port to talk to the bridge on</param>
+        /// <param name="settings"></param>
         public WBReader(ILogger<Worker> logger, WeighBridgeSettings settings)
         {
             _logger = logger;
+            WeighbridgeName = settings.WeighbridgeName;
             IPAddress = settings.IPAddress;
             Port = settings.Port;
 
             LastReadValue = -1;
+            WeighBridgeStatus = ' ';
         }
 
 
@@ -67,6 +69,16 @@ namespace WeighBridgeReader.Classes.WeighBridge
             }
 
             return result;
+        }
+
+
+        /// <summary>
+        /// Extracts the weighbridge data into object for POST
+        /// </summary>
+        /// <returns>Setups object with weight data for POSTing</returns>
+        public WeighbridgePOSTData ExtractPostData()
+        {
+            return new WeighbridgePOSTData { Weighbridge = this.WeighbridgeName, Weight = this.LastReadValue, Status = this.WeighBridgeStatus.ToString() };
         }
 
 

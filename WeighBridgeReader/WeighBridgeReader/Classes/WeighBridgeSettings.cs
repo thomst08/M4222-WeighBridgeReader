@@ -10,7 +10,12 @@ namespace WeighBridgeReader.Classes
     internal class WeighBridgeSettings
     {
         private string _ip = string.Empty;
+        private string _weighbridgeName = string.Empty;
+
+        public string WeighbridgeName { get => _weighbridgeName; set => _weighbridgeName = value; }
         public string IP { get => _ip; set => _ip = value; }
+        public int Port { get; set; }
+
         public IPAddress IPAddress {
             get {
                 if(_ip == string.Empty)
@@ -19,6 +24,5 @@ namespace WeighBridgeReader.Classes
                 return IPAddress.Parse(_ip);
             }
         }
-        public int Port { get; set; }
     }
 }
