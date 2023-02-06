@@ -22,6 +22,7 @@ namespace WeighBridgeReader
 
         //URL to submit all data to
         private string _url;
+        private int _timeout = 4;
 
         //Security details for receival API
         private string _siteId;
@@ -39,6 +40,10 @@ namespace WeighBridgeReader
             _logger = logger;
 
             _url = configuration.GetValue<string>("PostURL");
+            int i = configuration.GetValue<int>("PostTimeoutSeconds");
+            if (i != 0 || i > 0)
+                _timeout = i;
+
 
             _siteId = configuration.GetValue<string>("Security:SiteId");
             _clientId = configuration.GetValue<string>("Security:ClientId");
@@ -115,7 +120,7 @@ namespace WeighBridgeReader
                 content.Headers.Add("ClientId", _clientId);
                 content.Headers.Add("Secret", _secret);
 
-                client.Timeout = TimeSpan.FromSeconds(4);
+                client.Timeout = TimeSpan.FromSeconds(_timeout);
 
                 HttpResponseMessage temp = await client.PostAsync(_url, content);
                 if (temp != null)
