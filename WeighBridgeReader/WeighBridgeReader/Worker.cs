@@ -23,6 +23,11 @@ namespace WeighBridgeReader
         //URL to submit all data to
         private string _url;
 
+        //Security details for receival API
+        private string _siteId;
+        private string _clientId;
+        private string _secret;
+
         /// <summary>
         /// Constructor used to setup the service and to load all the weighbridges
         /// </summary>
@@ -34,11 +39,21 @@ namespace WeighBridgeReader
             _logger = logger;
 
             _url = configuration.GetValue<string>("PostURL");
+
+            _siteId = configuration.GetValue<string>("Security:SiteId");
+            _clientId = configuration.GetValue<string>("Security:ClientId");
+            _secret = configuration.GetValue<string>("Security:Secret");
+
+            if(string.IsNullOrWhiteSpace(_siteId) || string.IsNullOrWhiteSpace(_clientId) || string.IsNullOrWhiteSpace(_secret))
+            {
+                throw new ArgumentException("Appsettings file is incorrectly configured, missing security settings");
+            }
+
             List<WeighBridgeSettings> weighBridges = configuration.GetSection("WeighBridges").Get<List<WeighBridgeSettings>>();
 
             if(weighBridges == null)
             {
-                throw new ArgumentException("Appsettings file is incorrectly configured");
+                throw new ArgumentException("Appsettings file is incorrectly configured, does not have any weighbridges setup");
             }
  
             foreach(WeighBridgeSettings wb in weighBridges)
@@ -65,7 +80,7 @@ namespace WeighBridgeReader
                     bool result = wb.ReadNetwork();
                     if(result)
                     {
-                        _ = Task.Run(async () => await SendWeightInformationAsync(_url, wb.ExtractPostData(), _logger));
+                        _ = Task.Run(async () => await SendWeightInformationAsync(wb.ExtractPostData(), _logger));
 
 #if DEBUG
                         _logger.LogInformation("Posting data");
@@ -84,19 +99,34 @@ namespace WeighBridgeReader
         /// <summary>
         /// Function used to send weight information to URL
         /// </summary>
-        /// <param name="url"></param>
-        /// <param name="postData"></param>
+        /// <param name="postData">Weigh information to send</param>
+        /// <param name="logger"></param>
         /// <returns></returns>
-        private async Task SendWeightInformationAsync(string url, WeighbridgePOSTData postData, ILogger<Worker> logger)
+        private async Task SendWeightInformationAsync(WeighbridgePOSTData postData, ILogger<Worker> logger)
         {
             HttpClient client = new HttpClient();
             try
             {
                 string jsonString = JsonSerializer.Serialize(postData);
                 HttpContent content = new StringContent(jsonString, UnicodeEncoding.UTF8, "application/json");
+
+                //Add the security details
+                content.Headers.Add("SiteId", _siteId);
+                content.Headers.Add("ClientId", _clientId);
+                content.Headers.Add("Secret", _secret);
+
                 client.Timeout = TimeSpan.FromSeconds(4);
 
-                await client.PostAsync(url, content);
+                HttpResponseMessage temp = await client.PostAsync(_url, content);
+                if (temp != null)
+                {
+                    if (temp.StatusCode != HttpStatusCode.NoContent)
+                        logger.LogError($"Issue communications with API, received '{temp.StatusCode}' error code at {DateTime.Now}");
+#if DEBUG
+                    else
+                        logger.LogInformation("Received HTTP code 204 back from API");
+#endif
+                }
             }
             catch(Exception ex)
             {

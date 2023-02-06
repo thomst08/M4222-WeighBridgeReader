@@ -5,6 +5,11 @@
       "Microsoft.Hosting.Lifetime": "Information"
     }
   },
+  "Security": {
+    "SiteId": "",
+    "ClientId": "",
+    "Secret": ""
+  },
   "PostURL": "https://domain.com",
   "WeighBridges": [
     {

@@ -78,7 +78,7 @@ namespace WeighBridgeReader.Classes.WeighBridge
         /// <returns>Setups object with weight data for POSTing</returns>
         public WeighbridgePOSTData ExtractPostData()
         {
-            return new WeighbridgePOSTData { Weighbridge = this.WeighbridgeName, Weight = this.LastReadValue, Status = this.WeighBridgeStatus.ToString() };
+            return new WeighbridgePOSTData { Weighbridge = this.WeighbridgeName, Weight = this.LastReadValue, Status = this.WeighBridgeStatus.ToString(), Time = DateTime.Now };
         }
 
 

@@ -14,5 +14,6 @@ namespace WeighBridgeReader.Classes
         public string Weighbridge { get => _name; set => _name = value; }
         public float Weight { get; set; }
         public string Status { get => _status; set=> _status = value; }
+        public DateTime Time { get; set; }
     }
 }
