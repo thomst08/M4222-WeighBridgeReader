@@ -125,11 +125,11 @@ namespace WeighBridgeReader
                 HttpResponseMessage temp = await client.PostAsync(_url, content);
                 if (temp != null)
                 {
-                    if (temp.StatusCode != HttpStatusCode.NoContent)
+                    if (temp.StatusCode != HttpStatusCode.NoContent && temp.StatusCode != HttpStatusCode.Accepted)
                         logger.LogError($"Issue communications with API, received '{temp.StatusCode}' error code at {DateTime.Now}");
 #if DEBUG
                     else
-                        logger.LogInformation("Received HTTP code 204 back from API");
+                        logger.LogInformation($"Received HTTP '{temp.StatusCode}' back from API");
 #endif
                 }
             }
