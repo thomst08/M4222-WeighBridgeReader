@@ -5,6 +5,14 @@
       "Microsoft.Hosting.Lifetime": "Information"
     }
   },
+  "EventLog": {
+    "SourceName": "Weighbridge Weight Logger",
+    "LogName": "Application",
+    "LogLevel": {
+      "Microsoft": "Information",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  },
   "Security": {
     "SiteId": "",
     "ClientId": "",
@@ -13,6 +21,7 @@
   "PostURL": "https://domain.com",
   "WeighBridges": [
     {
+      "WeighbridgeName": "Name",
       "IP": "192.168.0.1",
       "Port": 80
     }
