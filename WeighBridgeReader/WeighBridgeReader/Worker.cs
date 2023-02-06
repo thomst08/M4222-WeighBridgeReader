@@ -22,7 +22,7 @@ namespace WeighBridgeReader
 
         //URL to submit all data to
         private string _url;
-        private int _timeout = 4;
+        private int _timeout = 10;
 
         //Security details for receival API
         private string _siteId;
