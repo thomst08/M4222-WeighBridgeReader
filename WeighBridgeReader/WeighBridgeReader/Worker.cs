@@ -1,10 +1,13 @@
 using System.Net.Sockets;
 using System.Net;
 using System.Text;
-using System.Text.Json;
+using System.Net.Http.Headers;
 using Microsoft.Extensions.Configuration;
 using WeighBridgeReader.Classes.WeighBridge;
 using WeighBridgeReader.Classes;
+using static System.Formats.Asn1.AsnWriter;
+using Microsoft.Extensions.Logging;
+using System.Xml.Linq;
 
 
 namespace WeighBridgeReader
@@ -24,10 +27,12 @@ namespace WeighBridgeReader
         private string _url;
         private int _timeout = 10;
 
-        //Security details for receival API
-        private string _siteId;
-        private string _clientId;
-        private string _secret;
+        //Hold authention details for microsoft servers
+        AzureAuthentication _authention;
+
+        private readonly string _enviromentName;
+        private readonly string _weighbridgeTableName;
+
 
         /// <summary>
         /// Constructor used to setup the service and to load all the weighbridges
@@ -44,23 +49,27 @@ namespace WeighBridgeReader
             if (i != 0 || i > 0)
                 _timeout = i;
 
+            _enviromentName = configuration.GetValue<string>("EnviromentTableName");
+            _weighbridgeTableName = configuration.GetValue<string>("WeighbridgeTableName");
 
-            _siteId = configuration.GetValue<string>("Security:SiteId");
-            _clientId = configuration.GetValue<string>("Security:ClientId");
-            _secret = configuration.GetValue<string>("Security:Secret");
+            //Load all authentication details
+            string authenticationURL = configuration.GetValue<string>("Security:AuthenticationURL");
+            string clientId = configuration.GetValue<string>("Security:ClientId");
+            string clientSecret = configuration.GetValue<string>("Security:ClientSecret");
+            string scope = configuration.GetValue<string>("Security:Scope");
 
-            if(string.IsNullOrWhiteSpace(_siteId) || string.IsNullOrWhiteSpace(_clientId) || string.IsNullOrWhiteSpace(_secret))
-            {
+            if(string.IsNullOrWhiteSpace(authenticationURL) || string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret) || string.IsNullOrWhiteSpace(scope))
                 throw new ArgumentException("Appsettings file is incorrectly configured, missing security settings");
-            }
+
+            _authention = new AzureAuthentication(logger, authenticationURL, clientId, clientSecret, scope);
+
 
             List<WeighBridgeSettings> weighBridges = configuration.GetSection("WeighBridges").Get<List<WeighBridgeSettings>>();
 
             if(weighBridges == null)
-            {
                 throw new ArgumentException("Appsettings file is incorrectly configured, does not have any weighbridges setup");
-            }
- 
+
+
             foreach(WeighBridgeSettings wb in weighBridges)
             {
                 if (wb.IP == string.Empty || wb.Port == 0 || wb.WeighbridgeName == string.Empty)
@@ -85,7 +94,7 @@ namespace WeighBridgeReader
                     bool result = wb.ReadNetwork();
                     if(result)
                     {
-                        _ = Task.Run(async () => await SendWeightInformationAsync(wb.ExtractPostData(), _logger));
+                        _ = Task.Run(async () => await SendWeightInformationAsync(wb.ExtractPostData()));
 
 #if DEBUG
                         _logger.LogInformation("Posting data");
@@ -101,43 +110,55 @@ namespace WeighBridgeReader
         }
 
 
+
         /// <summary>
-        /// Function used to send weight information to URL
+        /// Sends the weight information to Dataverse servers
         /// </summary>
-        /// <param name="postData">Weigh information to send</param>
-        /// <param name="logger"></param>
+        /// <param name="postData">Weight information read from bridge</param>
         /// <returns></returns>
-        private async Task SendWeightInformationAsync(WeighbridgePOSTData postData, ILogger<Worker> logger)
+        private async Task SendWeightInformationAsync(WeighbridgePOSTData postData)
         {
+            string tokenType = string.Empty;
+            string token = string.Empty;
+
+            //Fetch authencation token details for dataverse
+            try
+            {
+                (tokenType, token) = _authention.TokenAsync().Result;
+            }
+            catch
+            {
+                return;
+            }
+
+            //Setup and send data to Dataverse
             HttpClient client = new HttpClient();
             try
             {
-                string jsonString = JsonSerializer.Serialize(postData);
-                HttpContent content = new StringContent(jsonString, UnicodeEncoding.UTF8, "application/json");
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(tokenType, token);
 
-                //Add the security details
-                content.Headers.Add("SiteId", _siteId);
-                content.Headers.Add("ClientId", _clientId);
-                content.Headers.Add("Secret", _secret);
+                HttpContent content = new StringContent(postData.JsonSerialize(_enviromentName, _weighbridgeTableName), UnicodeEncoding.UTF8, "application/json");
+                content.Headers.Add("OData-MaxVersion", "4.0");
+                content.Headers.Add("OData-Version", "4.0");
+                content.Headers.TryAddWithoutValidation("If-None-Match", "null");
 
                 client.Timeout = TimeSpan.FromSeconds(_timeout);
-
-                HttpResponseMessage temp = await client.PostAsync(_url, content);
-                if (temp != null)
+                HttpResponseMessage received = await client.PostAsync(_url, content);
+                if (received != null)
                 {
-                    if (temp.StatusCode != HttpStatusCode.NoContent && temp.StatusCode != HttpStatusCode.Accepted)
-                        logger.LogError($"Issue communications with API, received '{temp.StatusCode}' error code at {DateTime.Now}");
+                    if (received.StatusCode != HttpStatusCode.NoContent && received.StatusCode != HttpStatusCode.Accepted)
+                        _logger.LogError($"Issue communications with API, received '{received.StatusCode}' error code at {DateTime.Now}");
 #if DEBUG
                     else
-                        logger.LogInformation($"Received HTTP '{temp.StatusCode}' back from API");
+                        _logger.LogInformation($"Received HTTP '{received.StatusCode}' back from API");
 #endif
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                logger.LogError($"Error Posting to URL: {ex.Message}");
+                _logger.LogError($"Error Posting results to URL: {ex.Message}");
             }
-            
+
             client.Dispose();
         }
     }

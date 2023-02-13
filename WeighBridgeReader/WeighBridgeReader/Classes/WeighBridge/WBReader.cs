@@ -19,6 +19,7 @@ namespace WeighBridgeReader.Classes.WeighBridge
         public string WeighbridgeName { get; private set; }
         public float LastReadValue { get; protected set; }
         public char WeighBridgeStatus { get; protected set; }
+        public string WeighBridgeGUID { get; protected set; }
 
 
         /// <summary>
@@ -30,6 +31,7 @@ namespace WeighBridgeReader.Classes.WeighBridge
         {
             _logger = logger;
             WeighbridgeName = settings.WeighbridgeName;
+            WeighBridgeGUID = settings.WeighbridgeGUID;
             IPAddress = settings.IPAddress;
             Port = settings.Port;
 
@@ -78,7 +80,13 @@ namespace WeighBridgeReader.Classes.WeighBridge
         /// <returns>Setups object with weight data for POSTing</returns>
         public WeighbridgePOSTData ExtractPostData()
         {
-            return new WeighbridgePOSTData { Weighbridge = this.WeighbridgeName, Weight = this.LastReadValue, Status = this.WeighBridgeStatus.ToString(), Time = DateTime.Now };
+            return new WeighbridgePOSTData { 
+                Weighbridge = this.WeighbridgeName,
+                Weight = this.LastReadValue,
+                Status = this.WeighBridgeStatus.ToString(),
+                Time = DateTime.Now,
+                WeighbridgeGUID = WeighBridgeGUID
+            };
         }
 
 

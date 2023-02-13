@@ -11,10 +11,13 @@ namespace WeighBridgeReader.Classes
     {
         private string _ip = string.Empty;
         private string _weighbridgeName = string.Empty;
+        private string _weighbridgeGUID = string.Empty;
 
         public string WeighbridgeName { get => _weighbridgeName; set => _weighbridgeName = value; }
         public string IP { get => _ip; set => _ip = value; }
         public int Port { get; set; }
+
+        public string WeighbridgeGUID { get => _weighbridgeGUID; set => _weighbridgeGUID = value; }
 
         public IPAddress IPAddress {
             get {

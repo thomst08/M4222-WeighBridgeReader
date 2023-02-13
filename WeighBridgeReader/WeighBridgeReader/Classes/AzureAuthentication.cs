@@ -64,12 +64,12 @@ namespace WeighBridgeReader.Classes
         /// <summary>
         /// Pulbic access to get the latest token on request
         /// </summary>
-        public async Task<string> TokenAsync()
+        public async Task<(string, string)> TokenAsync()
         {
             if (TokenValid())
                 await UpdateToken();
 
-            return _token.TokenType + " " + _token.AccessToken;
+            return (_token.TokenType, _token.AccessToken);
         }
 
 
@@ -92,6 +92,10 @@ namespace WeighBridgeReader.Classes
         /// <exception cref="Exception">Throws an error only if a token was not returned</exception>
         private async Task<bool> UpdateToken()
         {
+#if DEBUG
+            _logger.LogInformation("Fetching token information...");
+#endif
+
             bool result;
             int i = RetryCount;
             do
@@ -103,9 +107,11 @@ namespace WeighBridgeReader.Classes
             if(!result)
                 throw new Exception("Unable to retrive token details");
 
+#if DEBUG
+            _logger.LogInformation("Fetching token successful");
+#endif
             return true;
         }
-
 
         /// <summary>
         /// Retreives the latest Authentication Token on request

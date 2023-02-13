@@ -14,15 +14,19 @@
     }
   },
   "Security": {
-    "SiteId": "",
+    "AuthenticationURL": "",
     "ClientId": "",
-    "Secret": ""
+    "ClientSecret": "",
+    "Scope": ""
   },
-  "PostURL": "https://domain.com",
   "PostTimeoutSeconds": 10,
+  "PostURL": "https://domain.com",
+  "EnviromentTableName": "",
+  "WeighbridgeTableName": "",
   "WeighBridges": [
     {
       "WeighbridgeName": "Name",
+      "WeighbridgeGUID": "",
       "IP": "192.168.0.1",
       "Port": 80
     }
